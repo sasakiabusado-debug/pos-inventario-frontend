@@ -53,6 +53,24 @@
         .module-tab.active { background: #f97316; color: #0f172a; box-shadow: 0 8px 25px #f9731626; }
         .module-preview { background: linear-gradient(135deg,#172338,#111827 60%,#18243a); }
         .metric-card { background: linear-gradient(145deg,#111d30,#0f172a); border: 1px solid #243247; border-radius: 1rem; padding: 1.1rem; }
+        /* Maqueta tridimensional del saco de cemento, sin dependencias externas. */
+        .model-stage { min-height: 340px; perspective: 850px; touch-action: none; cursor: grab; user-select: none; display: grid; place-items: center; overflow: hidden; background: radial-gradient(ellipse at 50% 40%, #334155 0%, #172235 46%, #0b1425 85%); }
+        .model-stage:active { cursor: grabbing; }
+        .cement-bag { position: relative; width: 170px; height: 220px; transform-style: preserve-3d; transform: rotateX(var(--rx, -12deg)) rotateY(var(--ry, -27deg)); filter: drop-shadow(0 20px 18px #02061777); }
+        .bag-face { position: absolute; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; backface-visibility: hidden; border: 2px solid #d3c4a6; box-shadow: inset 0 0 20px #6e5d3e2b; }
+        .bag-front, .bag-back { width:170px; height:220px; border-radius: 9px 9px 13px 13px; background: linear-gradient(145deg,#f2e9d6,#cec0a2); }
+        .bag-front { transform: translateZ(41px); }
+        .bag-back { transform: rotateY(180deg) translateZ(41px); }
+        .bag-side { width:82px; height:220px; left:44px; top:0; background: repeating-linear-gradient(0deg,#cbbd9f 0 30px,#baab8d 30px 32px); }
+        .bag-left { transform: rotateY(-90deg) translateZ(85px); }
+        .bag-right { transform: rotateY(90deg) translateZ(85px); }
+        .bag-top, .bag-bottom { width:170px; height:82px; left:0; top:69px; background:#b9a98b; border-radius:8px; }
+        .bag-top { transform: rotateX(90deg) translateZ(110px); }
+        .bag-bottom { transform: rotateX(-90deg) translateZ(110px); }
+        .bag-brand { width:100%; padding:9px 3px; background: #e56c16; color: #fff7ed; font-weight:900; font-size:19px; letter-spacing:1px; }
+        .bag-front strong { font-size:21px; color:#263241; line-height:1.15; margin:10px 0; }
+        .bag-front small, .bag-back small { color:#6b5b45; font-size:11px; font-weight:800; }
+        .bag-front .bag-weight { border:2px solid #b46e3b; padding:5px 13px; border-radius:30px; color:#263241; font-weight:900; margin-top:9px; }
     </style>
 </head>
 <body class="h-full flex flex-col font-sans antialiased selection:bg-brand-500 selection:text-white">
@@ -256,6 +274,28 @@
         </section>
 
     </main>
+
+    <!-- VISOR 3D DE PRODUCTO: vista ilustrativa para la presentación universitaria -->
+    <div id="model-modal" class="hidden fixed inset-0 z-50 bg-slate-950/85 backdrop-blur-sm p-4 flex items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="model-title" onclick="if(event.target===this) closeProduct3D()">
+        <div class="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl">
+            <div class="px-5 py-4 flex justify-between items-center border-b border-slate-800">
+                <div><span class="text-[10px] text-brand-500 font-bold tracking-widest">VISUALIZACIÓN 3D</span><h2 id="model-title" class="font-bold text-white text-lg">Cemento Portland IP-40</h2></div>
+                <button onclick="closeProduct3D()" class="text-slate-400 hover:text-white bg-slate-800 rounded-lg h-9 w-9" aria-label="Cerrar visor 3D"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="model-stage" class="model-stage" aria-label="Saco de cemento tridimensional que puedes girar con el mouse o el dedo" tabindex="0">
+                <div id="cement-bag" class="cement-bag" style="--rx:-12deg;--ry:-27deg;">
+                    <div class="bag-face bag-front"><div class="bag-brand">CONSTRU<span style="color:#263241">POS</span></div><strong>CEMENTO<br>PORTLAND</strong><small>TIPO IP-40 · USO GENERAL</small><div class="bag-weight">50 KG</div><small style="margin-top:12px">MATERIAL DE CONSTRUCCIÓN</small></div>
+                    <div class="bag-face bag-back"><div class="bag-brand">CONSTRUPOS</div><strong style="color:#263241;font-size:18px;margin:12px 0">CEMENTO<br>IP-40</strong><small>Conservar en lugar seco</small><small>Saco 50 kg</small></div>
+                    <div class="bag-face bag-side bag-left"></div><div class="bag-face bag-side bag-right"></div>
+                    <div class="bag-face bag-top"></div><div class="bag-face bag-bottom"></div>
+                </div>
+            </div>
+            <div class="px-5 py-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
+                <p class="text-xs text-slate-400"><i class="fa-solid fa-hand-pointer text-brand-500 mr-1"></i> Arrastra para girar el saco. Modelo ilustrativo de demostración.</p>
+                <div class="flex gap-2"><button id="model-spin-btn" onclick="toggleProduct3DSpin()" class="bg-slate-800 hover:bg-slate-700 rounded-lg px-3 py-2 text-xs font-bold"><i class="fa-solid fa-pause mr-1"></i>Pausar giro</button><button onclick="resetProduct3D()" class="bg-brand-500 hover:bg-brand-600 text-slate-950 rounded-lg px-3 py-2 text-xs font-bold"><i class="fa-solid fa-rotate mr-1"></i>Restablecer</button></div>
+            </div>
+        </div>
+    </div>
 
     <section id="sales-details" class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8 grid md:grid-cols-2 gap-5">
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
@@ -525,6 +565,7 @@
                             <h3 class="font-semibold text-slate-100 text-sm mb-3 group-hover:text-brand-500 transition line-clamp-2">
                                 ${escapeHtml(product.nombre)}
                             </h3>
+                            ${product.sku === 'MAT-CEM-001' ? `<button type="button" onclick="openProduct3D()" class="mb-3 w-full border border-brand-500/40 bg-brand-500/10 hover:bg-brand-500/20 text-brand-500 rounded-lg py-2 text-xs font-bold transition"><i class="fa-solid fa-cube mr-2"></i>Ver producto en 3D</button>` : ''}
                         </div>
 
                         <!-- Price & Add Button -->
@@ -800,7 +841,66 @@
             } catch (e) { el.textContent = `No se pudo consultar Kardex: ${e.message}`; }
         }
 
-        // 7. UTILITY FUNCTIONS (Modals & Toasts)
+        // 7. VISOR 3D: rotation, drag and touch gestures.
+        let modelRotationX = -12;
+        let modelRotationY = -27;
+        let modelSpinning = false;
+        let modelAnimationFrame = null;
+        let modelPointer = null;
+        function updateProduct3D() {
+            const bag = document.getElementById('cement-bag');
+            bag.style.setProperty('--rx', `${modelRotationX}deg`);
+            bag.style.setProperty('--ry', `${modelRotationY}deg`);
+        }
+        function modelFrame() {
+            if (!modelSpinning) return;
+            modelRotationY = (modelRotationY + 0.38) % 360;
+            updateProduct3D();
+            modelAnimationFrame = requestAnimationFrame(modelFrame);
+        }
+        function toggleProduct3DSpin(force) {
+            modelSpinning = typeof force === 'boolean' ? force : !modelSpinning;
+            if (modelAnimationFrame !== null) cancelAnimationFrame(modelAnimationFrame);
+            modelAnimationFrame = null;
+            const btn = document.getElementById('model-spin-btn');
+            btn.innerHTML = modelSpinning ? '<i class="fa-solid fa-pause mr-1"></i>Pausar giro' : '<i class="fa-solid fa-play mr-1"></i>Girar automáticamente';
+            if (modelSpinning) modelFrame();
+        }
+        function resetProduct3D() {
+            modelRotationX = -12; modelRotationY = -27;
+            updateProduct3D(); toggleProduct3DSpin(true);
+        }
+        function openProduct3D() {
+            document.getElementById('model-modal').classList.remove('hidden');
+            resetProduct3D();
+            document.getElementById('model-stage').focus();
+        }
+        function closeProduct3D() {
+            toggleProduct3DSpin(false);
+            document.getElementById('model-modal').classList.add('hidden');
+        }
+        document.getElementById('model-stage').addEventListener('pointerdown', event => {
+            modelPointer = {id:event.pointerId,x:event.clientX,y:event.clientY};
+            event.currentTarget.setPointerCapture(event.pointerId);
+            toggleProduct3DSpin(false);
+        });
+        document.getElementById('model-stage').addEventListener('pointermove', event => {
+            if (!modelPointer || modelPointer.id !== event.pointerId) return;
+            const dx = event.clientX - modelPointer.x;
+            const dy = event.clientY - modelPointer.y;
+            modelRotationY += dx * 0.6;
+            modelRotationX = Math.max(-85, Math.min(85, modelRotationX - dy * 0.45));
+            modelPointer.x = event.clientX; modelPointer.y = event.clientY;
+            updateProduct3D();
+        });
+        for (const eventName of ['pointerup','pointercancel','lostpointercapture']) {
+            document.getElementById('model-stage').addEventListener(eventName, () => { modelPointer = null; });
+        }
+        document.addEventListener('keydown', event => {
+            if (event.key === 'Escape' && !document.getElementById('model-modal').classList.contains('hidden')) closeProduct3D();
+        });
+
+        // 8. UTILITY FUNCTIONS (Modals & Toasts)
         function toggleModal(modalId, show) {
             const modal = document.getElementById(modalId);
             if (show) modal.classList.remove('hidden');
