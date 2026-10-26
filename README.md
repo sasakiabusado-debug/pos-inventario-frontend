@@ -1,0 +1,2 @@
+# pos-inventario-frontend
+Tarea
