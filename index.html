@@ -171,12 +171,15 @@
 
                 <!-- Customer Details Input Section -->
                 <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 mb-4 flex flex-col gap-2">
-                    <label class="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
-                        <i class="fa-solid fa-user-tag text-brand-500"></i> Cliente / Obra
-                    </label>
-                    <input type="text" id="customer-name" placeholder="Ej: Constructora Andes S.A." 
-                           value="Cliente Contado"
-                           class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500">
+                    <label for="seller-select" class="text-xs font-semibold text-slate-400">Usuario que registra la venta *</label>
+                    <select id="seller-select" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200"><option value="">Cargando usuarios...</option></select>
+                    <label for="customer-select" class="text-xs font-semibold text-slate-400">Cliente</label>
+                    <select id="customer-select" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200"><option value="">Consumidor final (sin cliente)</option></select>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="new-customer-name" maxlength="150" placeholder="Nombre nuevo cliente" class="min-w-0 bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-xs text-white">
+                        <input type="text" id="new-customer-nit" maxlength="30" placeholder="NIT / CI" class="min-w-0 bg-slate-900 border border-slate-800 rounded-lg px-2 py-2 text-xs text-white">
+                    </div>
+                    <button type="button" id="create-customer-btn" onclick="createCustomer()" class="text-xs bg-slate-800 rounded-lg p-2 hover:bg-slate-700">Guardar cliente nuevo</button>
                 </div>
 
                 <!-- Cart Items Container (Scrollable) -->
@@ -215,6 +218,17 @@
         </section>
 
     </main>
+
+    <section class="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pb-8 grid md:grid-cols-2 gap-5">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div class="flex justify-between mb-3"><h2 class="font-bold">Últimas ventas</h2><button onclick="fetchSales()" class="text-brand-500 text-xs">Actualizar</button></div>
+            <div id="sales-history" class="text-xs text-slate-400 max-h-72 overflow-auto">Conectando...</div>
+        </div>
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+            <div class="flex justify-between mb-3"><h2 class="font-bold">Movimientos de inventario (Kardex)</h2><button onclick="fetchKardex()" class="text-brand-500 text-xs">Actualizar</button></div>
+            <div id="kardex-history" class="text-xs text-slate-400 max-h-72 overflow-auto">Conectando...</div>
+        </div>
+    </section>
 
     <!-- CREATE PRODUCT MODAL -->
     <div id="product-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
@@ -293,24 +307,34 @@
         // CONFIGURATION & CONSTANTS
         const API_BASE_URL = 'https://pos-inventario-backend.onrender.com';
         
-        // Fallback Mock Data in case Render API is sleeping or cold-starting
-        const MOCK_PRODUCTS = [
-            { id: 101, sku: 'MAT-CEM-001', nombre: 'Cemento Portland IP-40 (Bolsa 50kg)', precio_compra: 45.00, precio_venta: 55.00, stock_actual: 120, stock_minimo: 15 },
-            { id: 102, sku: 'MAT-FIE-002', nombre: 'Fierro Corrugado 12mm x 12m', precio_compra: 65.00, precio_venta: 80.00, stock_actual: 75, stock_minimo: 10 },
-            { id: 103, sku: 'MAT-LAD-003', nombre: 'Ladrillo 6 Huecos (Unidad)', precio_compra: 1.20, precio_venta: 1.80, stock_actual: 1400, stock_minimo: 200 },
-            { id: 104, sku: 'ACAB-PIN-004', nombre: 'Pintura Látex Blanca 4 Litros', precio_compra: 90.00, precio_venta: 120.00, stock_actual: 22, stock_minimo: 5 },
-            { id: 105, sku: 'HER-WIN-005', nombre: 'Flexómetro / Cinta Métrica 5m', precio_compra: 15.00, precio_venta: 25.00, stock_actual: 30, stock_minimo: 8 }
-        ];
-
         // GLOBAL APPLICATION STATE
         let products = [];
         let cart = [];
         let isApiOnline = false;
+        let isProcessing = false;
+        let customers = [];
+
+        const escapeHtml = (value) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+        async function apiRequest(path, options = {}) {
+            const response = await fetch(`${API_BASE_URL}${path}`, options);
+            let body;
+            try { body = await response.json(); } catch (_) { body = null; }
+            if (!response.ok) {
+                const detail = body?.detail;
+                throw new Error(typeof detail === 'string' ? detail : `Error HTTP ${response.status}`);
+            }
+            return body;
+        }
 
         // INITIALIZATION
         document.addEventListener('DOMContentLoaded', () => {
             checkApiHealth();
             fetchProducts();
+            fetchUsers();
+            fetchCustomers();
+            fetchSales();
+            fetchKardex();
 
             // Search Filter Listener
             document.getElementById('search-input').addEventListener('input', (e) => {
@@ -338,7 +362,7 @@
                 }
             } catch (err) {
                 isApiOnline = false;
-                statusText.textContent = 'Modo Contingencia (Offline)';
+                statusText.textContent = 'Sin conexión: ventas deshabilitadas';
                 badge.className = 'flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-full text-xs font-medium text-amber-400';
                 pingDot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500';
                 pingPulse.className = 'hidden';
@@ -354,18 +378,19 @@
             refreshBtn.classList.add('animate-spin');
 
             try {
-                const response = await fetch(`${API_BASE_URL}/api/v1/products`);
-                if (!response.ok) throw new Error('Error al cargar productos');
-                
-                products = await response.json();
+                const loaded = await apiRequest('/api/v1/products');
+                if (!Array.isArray(loaded)) throw new Error('Formato de productos inválido');
+                products = loaded;
+                isApiOnline = true;
                 showToast('Catálogo actualizado con éxito', 'success');
             } catch (error) {
-                console.warn('API no disponible o despertando. Cargando datos de contingencia.', error);
-                products = [...MOCK_PRODUCTS];
-                showToast('Usando datos locales de contingencia', 'warning');
+                products = [];
+                isApiOnline = false;
+                showToast(`No se pudo cargar el catálogo: ${error.message}`, 'error');
             } finally {
                 refreshBtn.classList.remove('animate-spin');
-                renderProducts();
+                renderProducts(document.getElementById('search-input').value.toLowerCase().trim());
+                renderCart();
             }
         }
 
@@ -400,7 +425,7 @@
                             <!-- Top Info: SKU & Stock Badge -->
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-[11px] font-mono font-medium text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800/80">
-                                    ${product.sku}
+                                    ${escapeHtml(product.sku)}
                                 </span>
                                 <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
                                     isOutOfStock 
@@ -415,7 +440,7 @@
 
                             <!-- Product Name -->
                             <h3 class="font-semibold text-slate-100 text-sm mb-3 group-hover:text-brand-500 transition line-clamp-2">
-                                ${product.nombre}
+                                ${escapeHtml(product.nombre)}
                             </h3>
                         </div>
 
@@ -438,10 +463,10 @@
 
         // 4. CART MANAGEMENT FUNCTIONS
         function addToCart(productId) {
-            const product = products.find(p => p.id === productId);
+            const product = products.find(p => Number(p.id) === Number(productId));
             if (!product) return;
 
-            const existingItem = cart.find(item => item.id === productId);
+            const existingItem = cart.find(item => Number(item.id) === Number(productId));
 
             if (existingItem) {
                 if (existingItem.quantity + 1 > product.stock_actual) {
@@ -458,10 +483,10 @@
         }
 
         function updateCartQuantity(productId, delta) {
-            const item = cart.find(i => i.id === productId);
+            const item = cart.find(i => Number(i.id) === Number(productId));
             if (!item) return;
 
-            const product = products.find(p => p.id === productId);
+            const product = products.find(p => Number(p.id) === Number(productId));
             const newQty = item.quantity + delta;
 
             if (newQty <= 0) {
@@ -516,7 +541,7 @@
                 return `
                     <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3">
                         <div class="flex-1 min-w-0">
-                            <h4 class="text-xs font-semibold text-slate-200 truncate">${item.nombre}</h4>
+                            <h4 class="text-xs font-semibold text-slate-200 truncate">${escapeHtml(item.nombre)}</h4>
                             <p class="text-[11px] font-mono text-brand-500 font-medium">$${Number(item.precio_venta).toFixed(2)} c/u</p>
                         </div>
 
@@ -544,35 +569,39 @@
 
             subtotalSpan.textContent = `$${total.toFixed(2)}`;
             totalSpan.textContent = `$${total.toFixed(2)}`;
-            checkoutBtn.disabled = false;
+            checkoutBtn.disabled = isProcessing || !isApiOnline || !document.getElementById('seller-select').value;
         }
 
         // 5. PROCESS CHECKOUT / VENTA
         async function processCheckout() {
-            if (cart.length === 0) return;
+            if (cart.length === 0 || isProcessing) return;
 
             const checkoutBtn = document.getElementById('checkout-btn');
-            const customerName = document.getElementById('customer-name').value || 'Cliente Contado';
+            const userId = Number(document.getElementById('seller-select').value);
+            const customerValue = document.getElementById('customer-select').value;
+            if (!Number.isInteger(userId) || userId <= 0) {
+                showToast('Selecciona un usuario activo para vender', 'warning'); return;
+            }
 
+            isProcessing = true;
             checkoutBtn.disabled = true;
             checkoutBtn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> Procesando Venta...`;
-
-            // Deduct local stock for immediate user feedback
-            cart.forEach(cartItem => {
-                const prod = products.find(p => p.id === cartItem.id);
-                if (prod) {
-                    prod.stock_actual -= cartItem.quantity;
-                }
-            });
-
-            // Simulate server transaction time
-            setTimeout(() => {
-                showToast(`¡Venta completada para ${customerName}!`, 'success');
-                clearCart();
-                renderProducts();
-
+            try {
+                const sale = await apiRequest('/api/v1/sales/checkout', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ user_id: userId, customer_id: customerValue ? Number(customerValue) : null,
+                        items: cart.map(item => ({product_id: Number(item.id), cantidad: item.quantity})) })
+                });
+                showToast(`Venta #${sale.id} registrada. Total: Bs ${Number(sale.total_amount).toFixed(2)}`, 'success');
+                cart = [];
+                await Promise.all([fetchProducts(), fetchSales(), fetchKardex()]);
+            } catch (error) {
+                showToast(`Venta no confirmada: ${error.message}. Verifica el historial antes de reintentar.`, 'error');
+            } finally {
+                isProcessing = false;
                 checkoutBtn.innerHTML = `<i class="fa-solid fa-receipt"></i><span>Completar Venta</span>`;
-            }, 800);
+                renderCart();
+            }
         }
 
         // 6. CREATE NEW PRODUCT HANDLER
@@ -593,34 +622,93 @@
             };
 
             try {
-                if (isApiOnline) {
-                    const res = await fetch(`${API_BASE_URL}/api/v1/products`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(newProduct)
-                    });
-
-                    if (!res.ok) throw new Error('Error en el servidor');
-                    
-                    const savedProduct = await res.json();
-                    products.push(savedProduct);
-                } else {
-                    // Fallback local save
-                    const mockSaved = { ...newProduct, id: Date.now() };
-                    products.push(mockSaved);
-                }
+                await apiRequest('/api/v1/products', {method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(newProduct)});
 
                 showToast('Material registrado exitosamente', 'success');
                 toggleModal('product-modal', false);
                 document.getElementById('product-form').reset();
-                renderProducts();
+                await fetchProducts();
 
             } catch (err) {
-                showToast('No se pudo guardar el producto en Render', 'error');
+                showToast(`No se pudo guardar el producto: ${err.message}`, 'error');
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = `<i class="fa-solid fa-floppy-disk"></i><span>Guardar Producto</span>`;
             }
+        }
+
+        async function fetchUsers() {
+            const select = document.getElementById('seller-select');
+            const current = select.value;
+            try {
+                const users = await apiRequest('/api/v1/users');
+                select.innerHTML = '<option value="">Seleccionar usuario...</option>' + users.map(u =>
+                    `<option value="${Number(u.id)}">${escapeHtml(u.nombre)} (${escapeHtml(u.rol)})</option>`).join('');
+                if (users.some(u => String(u.id) === current)) select.value = current;
+                if (!users.length) showToast('No hay usuarios activos. Debes crear uno en la base de datos antes de vender.', 'warning');
+            } catch (e) {
+                select.innerHTML = '<option value="">No se pudieron cargar usuarios</option>';
+                showToast(`Error cargando usuarios: ${e.message}`, 'error');
+            }
+            renderCart();
+        }
+
+        async function fetchCustomers(selectedId = '') {
+            const select = document.getElementById('customer-select');
+            const previous = selectedId || select.value;
+            try {
+                customers = await apiRequest('/api/v1/customers');
+                select.innerHTML = '<option value="">Consumidor final (sin cliente)</option>' + customers.map(c =>
+                    `<option value="${Number(c.id)}">${escapeHtml(c.nombre_razon_social)} — ${escapeHtml(c.nit_ci)}</option>`).join('');
+                if (customers.some(c => String(c.id) === String(previous))) select.value = previous;
+            } catch (e) {
+                showToast(`Error cargando clientes: ${e.message}`, 'error');
+            }
+        }
+
+        async function createCustomer() {
+            const name = document.getElementById('new-customer-name').value.trim();
+            const nit = document.getElementById('new-customer-nit').value.trim();
+            if (!name || !nit) { showToast('Completa nombre y NIT/CI del cliente', 'warning'); return; }
+            const button = document.getElementById('create-customer-btn');
+            button.disabled = true;
+            try {
+                const created = await apiRequest('/api/v1/customers', {
+                    method: 'POST', headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({nombre_razon_social: name, nit_ci: nit})
+                });
+                document.getElementById('new-customer-name').value = '';
+                document.getElementById('new-customer-nit').value = '';
+                await fetchCustomers(String(created.id));
+                showToast('Cliente guardado en Supabase', 'success');
+            } catch (e) { showToast(`No se guardó el cliente: ${e.message}`, 'error'); }
+            finally { button.disabled = false; }
+        }
+
+        async function fetchSales() {
+            const el = document.getElementById('sales-history');
+            try {
+                const sales = await apiRequest('/api/v1/sales');
+                el.innerHTML = sales.length ? sales.map(s => `
+                    <div class="border-b border-slate-800 py-2 flex justify-between gap-2">
+                        <div><span class="text-white font-semibold">Venta #${Number(s.id)}</span>
+                        <div>${new Date(s.created_at).toLocaleString('es-BO')} · ${s.items.length} producto(s)</div></div>
+                        <strong class="text-emerald-400">Bs ${Number(s.total_amount).toFixed(2)}</strong>
+                    </div>`).join('') : 'Todavía no se registraron ventas.';
+            } catch (e) { el.textContent = `No se pudo consultar ventas: ${e.message}`; }
+        }
+
+        async function fetchKardex() {
+            const el = document.getElementById('kardex-history');
+            try {
+                const movements = await apiRequest('/api/v1/kardex');
+                el.innerHTML = movements.length ? movements.slice(0, 100).map(m => `
+                    <div class="border-b border-slate-800 py-2 flex justify-between gap-2">
+                        <div><span class="text-white">${escapeHtml(m.tipo_movimiento)} · Producto #${Number(m.product_id)}</span>
+                        <div>${escapeHtml(m.motivo_referencia || '')}</div></div>
+                        <div class="text-right">${Number(m.cantidad)} uds.<div>${Number(m.stock_anterior)} → ${Number(m.stock_resultante)}</div></div>
+                    </div>`).join('') : 'Aún no hay movimientos.';
+            } catch (e) { el.textContent = `No se pudo consultar Kardex: ${e.message}`; }
         }
 
         // 7. UTILITY FUNCTIONS (Modals & Toasts)
@@ -644,7 +732,7 @@
             toast.className = `pointer-events-auto bg-slate-900 border border-slate-800 text-slate-100 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium animate-in slide-in-from-top-2 duration-200`;
             toast.innerHTML = `
                 <i class="fa-solid ${icons[type]} text-base"></i>
-                <span class="flex-1">${message}</span>
+                <span class="flex-1">${escapeHtml(message)}</span>
             `;
 
             container.appendChild(toast);
