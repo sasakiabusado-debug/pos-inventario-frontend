@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>POS & Inventario - Constructora Pro</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#fff7ed',
+                            100: '#ffedd5',
+                            500: '#f97316', // Vibrant industrial orange
+                            600: '#ea580c',
+                            700: '#c2410c',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbar styling for seamless dark design */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #f97316;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased selection:bg-brand-500 selection:text-white">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none"></div>
+
+    <!-- MAIN HEADER -->
+    <header class="bg-slate-900 border-b border-slate-800 sticky top-0 z-30 shadow-lg">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <!-- Brand Logo -->
+            <div class="flex items-center gap-3">
+                <div class="bg-brand-500 text-slate-950 p-2.5 rounded-xl font-black text-xl flex items-center justify-center shadow-md shadow-brand-500/20">
+                    <i class="fa-solid fa-helmet-safety text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+                        CONSTRU<span class="text-brand-500">POS</span>
+                        <span class="bg-slate-800 text-slate-400 text-xs px-2 py-0.5 rounded-full border border-slate-700 font-normal">v1.0</span>
+                    </h1>
+                    <p class="text-xs text-slate-400">Punto de Venta e Inventario Industrial</p>
+                </div>
+            </div>
+
+            <!-- API Status & Docs Link -->
+            <div class="flex items-center gap-4">
+                <!-- Live Connection Badge -->
+                <div id="api-status-badge" class="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-full text-xs font-medium text-slate-300">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span id="api-ping-pulse" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span id="api-ping-dot" class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                    </span>
+                    <span id="api-status-text">Conectando API...</span>
+                </div>
+
+                <!-- Swagger Documentation Button -->
+                <a href="https://pos-inventario-backend.onrender.com/docs" target="_blank" rel="noopener noreferrer"
+                   class="hidden sm:flex items-center gap-2 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs font-semibold px-3.5 py-1.5 rounded-lg transition-all duration-200 hover:text-white">
+                    <i class="fa-solid fa-code text-brand-500"></i>
+                    <span>Swagger API Docs</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px] text-slate-400"></i>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN APP CONTAINER -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- LEFT COLUMN: CATALOG & INVENTORY MANAGEMENT (8 COLS) -->
+        <section class="lg:col-span-7 xl:col-span-8 flex flex-col gap-6">
+
+            <!-- Controls Header: Search + Create Product Modal Trigger -->
+            <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-sm flex flex-col sm:flex-row gap-4 justify-between items-center">
+                
+                <!-- Search Input -->
+                <div class="relative w-full sm:w-80">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                    <input type="text" id="search-input" placeholder="Buscar por nombre o SKU..." 
+                           class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition">
+                </div>
+
+                <!-- Actions Group -->
+                <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <!-- Refresh List Button -->
+                    <button id="refresh-btn" onclick="fetchProducts()" 
+                            class="bg-slate-800 hover:bg-slate-700 text-slate-300 p-2.5 rounded-xl border border-slate-700 transition" title="Refrescar catálogo">
+                        <i class="fa-solid fa-rotate-right text-sm"></i>
+                    </button>
+
+                    <!-- New Product Modal Trigger Button -->
+                    <button onclick="toggleModal('product-modal', true)" 
+                            class="bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-lg shadow-brand-500/20 transition active:scale-95">
+                        <i class="fa-solid fa-plus text-xs"></i>
+                        <span>Nuevo Material</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Products Grid Container -->
+            <div class="flex-1">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-2">
+                        <i class="fa-solid fa-boxes-stacked text-brand-500"></i> Catálogo de Materiales
+                    </h2>
+                    <span id="product-count" class="text-xs text-slate-500 font-mono">0 productos</span>
+                </div>
+
+                <!-- Product Grid List -->
+                <div id="products-grid" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                    <!-- Skeleton Loader State -->
+                    <div class="bg-slate-900 border border-slate-800/80 rounded-2xl p-4 animate-pulse flex flex-col justify-between h-44">
+                        <div class="h-4 bg-slate-800 rounded w-3/4"></div>
+                        <div class="h-3 bg-slate-800 rounded w-1/2"></div>
+                        <div class="h-6 bg-slate-800 rounded w-1/3 my-2"></div>
+                        <div class="h-9 bg-slate-800 rounded-xl w-full"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- RIGHT COLUMN: SHOPPING CART & CHECKOUT (4 COLS) -->
+        <section class="lg:col-span-5 xl:col-span-4 flex flex-col">
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl flex flex-col h-full sticky top-24">
+                
+                <!-- Cart Header -->
+                <div class="flex items-center justify-between border-b border-slate-800 pb-4 mb-4">
+                    <div class="flex items-center gap-2.5">
+                        <div class="bg-slate-800 text-brand-500 p-2 rounded-lg">
+                            <i class="fa-solid fa-cart-shopping"></i>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-white text-base">Orden de Venta</h2>
+                            <p class="text-xs text-slate-400">Punto de Cobro</p>
+                        </div>
+                    </div>
+                    <button onclick="clearCart()" class="text-xs text-slate-400 hover:text-red-400 transition flex items-center gap-1">
+                        <i class="fa-solid fa-trash-can"></i> Limpiar
+                    </button>
+                </div>
+
+                <!-- Customer Details Input Section -->
+                <div class="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 mb-4 flex flex-col gap-2">
+                    <label class="text-xs font-semibold text-slate-400 flex items-center gap-1.5">
+                        <i class="fa-solid fa-user-tag text-brand-500"></i> Cliente / Obra
+                    </label>
+                    <input type="text" id="customer-name" placeholder="Ej: Constructora Andes S.A." 
+                           value="Cliente Contado"
+                           class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-600 focus:outline-none focus:border-brand-500">
+                </div>
+
+                <!-- Cart Items Container (Scrollable) -->
+                <div id="cart-items" class="flex-1 overflow-y-auto max-h-[360px] pr-1 space-y-3 mb-4">
+                    <!-- Empty Cart Placeholder State -->
+                    <div id="empty-cart-msg" class="flex flex-col items-center justify-center py-12 text-slate-500 text-center">
+                        <i class="fa-solid fa-basket-shopping text-4xl mb-3 opacity-30"></i>
+                        <p class="text-sm font-medium">El carrito está vacío</p>
+                        <p class="text-xs text-slate-600 mt-1">Selecciona materiales del catálogo para vender</p>
+                    </div>
+                </div>
+
+                <!-- Checkout Summary Footer -->
+                <div class="border-t border-slate-800 pt-4 space-y-3 mt-auto">
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>Subtotal</span>
+                        <span id="summary-subtotal" class="font-mono text-slate-200">$0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center text-xs text-slate-400">
+                        <span>Impuestos (0%)</span>
+                        <span class="font-mono text-slate-200">$0.00</span>
+                    </div>
+                    <div class="flex justify-between items-center text-base font-bold text-white pt-2 border-t border-slate-800/60">
+                        <span>Total a Pagar</span>
+                        <span id="summary-total" class="font-mono text-brand-500 text-xl">$0.00</span>
+                    </div>
+
+                    <!-- Checkout Action Button -->
+                    <button id="checkout-btn" onclick="processCheckout()" disabled 
+                            class="w-full bg-brand-500 disabled:bg-slate-800 disabled:text-slate-600 hover:bg-brand-600 text-slate-950 font-extrabold py-3.5 rounded-xl shadow-lg shadow-brand-500/20 disabled:shadow-none transition duration-200 flex items-center justify-center gap-2 text-sm mt-2 active:scale-[0.98]">
+                        <i class="fa-solid fa-receipt"></i>
+                        <span>Completar Venta</span>
+                    </button>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- CREATE PRODUCT MODAL -->
+    <div id="product-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm hidden">
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-4 border-b border-slate-800 mb-5">
+                <div class="flex items-center gap-2">
+                    <div class="bg-brand-500/10 text-brand-500 p-2 rounded-lg">
+                        <i class="fa-solid fa-box-archive"></i>
+                    </div>
+                    <h3 class="text-base font-bold text-white">Registrar Nuevo Material</h3>
+                </div>
+                <button onclick="toggleModal('product-modal', false)" class="text-slate-500 hover:text-slate-300 p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+
+            <!-- Product Form -->
+            <form id="product-form" onsubmit="handleCreateProduct(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">SKU / Código *</label>
+                    <input type="text" id="form-sku" required placeholder="Ej: MAT-CEM-005"
+                           class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-300 mb-1">Nombre del Producto *</label>
+                    <input type="text" id="form-nombre" required placeholder="Ej: Bolsa de Cemento 50kg"
+                           class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Precio Compra ($) *</label>
+                        <input type="number" step="0.01" id="form-precio-compra" required placeholder="40.00"
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Precio Venta ($) *</label>
+                        <input type="number" step="0.01" id="form-precio-venta" required placeholder="55.00"
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Stock Inicial *</label>
+                        <input type="number" id="form-stock-actual" required placeholder="100"
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-300 mb-1">Stock Mínimo *</label>
+                        <input type="number" id="form-stock-minimo" required placeholder="10"
+                               class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm text-slate-100 placeholder-slate-600 focus:outline-none focus:border-brand-500">
+                    </div>
+                </div>
+
+                <!-- Buttons -->
+                <div class="flex items-center justify-end gap-3 pt-4 border-t border-slate-800 mt-6">
+                    <button type="button" onclick="toggleModal('product-modal', false)" 
+                            class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white hover:bg-slate-800 transition">
+                        Cancelar
+                    </button>
+                    <button type="submit" id="save-product-btn"
+                            class="bg-brand-500 hover:bg-brand-600 text-slate-950 font-bold px-5 py-2 rounded-xl text-xs flex items-center gap-2 transition">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Guardar Producto</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- JAVASCRIPT LOGIC -->
+    <script>
+        // CONFIGURATION & CONSTANTS
+        const API_BASE_URL = 'https://pos-inventario-backend.onrender.com';
+        
+        // Fallback Mock Data in case Render API is sleeping or cold-starting
+        const MOCK_PRODUCTS = [
+            { id: 101, sku: 'MAT-CEM-001', nombre: 'Cemento Portland IP-40 (Bolsa 50kg)', precio_compra: 45.00, precio_venta: 55.00, stock_actual: 120, stock_minimo: 15 },
+            { id: 102, sku: 'MAT-FIE-002', nombre: 'Fierro Corrugado 12mm x 12m', precio_compra: 65.00, precio_venta: 80.00, stock_actual: 75, stock_minimo: 10 },
+            { id: 103, sku: 'MAT-LAD-003', nombre: 'Ladrillo 6 Huecos (Unidad)', precio_compra: 1.20, precio_venta: 1.80, stock_actual: 1400, stock_minimo: 200 },
+            { id: 104, sku: 'ACAB-PIN-004', nombre: 'Pintura Látex Blanca 4 Litros', precio_compra: 90.00, precio_venta: 120.00, stock_actual: 22, stock_minimo: 5 },
+            { id: 105, sku: 'HER-WIN-005', nombre: 'Flexómetro / Cinta Métrica 5m', precio_compra: 15.00, precio_venta: 25.00, stock_actual: 30, stock_minimo: 8 }
+        ];
+
+        // GLOBAL APPLICATION STATE
+        let products = [];
+        let cart = [];
+        let isApiOnline = false;
+
+        // INITIALIZATION
+        document.addEventListener('DOMContentLoaded', () => {
+            checkApiHealth();
+            fetchProducts();
+
+            // Search Filter Listener
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                renderProducts(e.target.value.toLowerCase().trim());
+            });
+        });
+
+        // 1. CHECK API HEALTH & UPDATE HEADER BADGE
+        async function checkApiHealth() {
+            const badge = document.getElementById('api-status-badge');
+            const statusText = document.getElementById('api-status-text');
+            const pingDot = document.getElementById('api-ping-dot');
+            const pingPulse = document.getElementById('api-ping-pulse');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/`, { method: 'GET' });
+                if (response.ok) {
+                    isApiOnline = true;
+                    statusText.textContent = 'API en Línea (Render)';
+                    badge.className = 'flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full text-xs font-medium text-emerald-400';
+                    pingDot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500';
+                    pingPulse.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+                } else {
+                    throw new Error('API degraded');
+                }
+            } catch (err) {
+                isApiOnline = false;
+                statusText.textContent = 'Modo Contingencia (Offline)';
+                badge.className = 'flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-3 py-1.5 rounded-full text-xs font-medium text-amber-400';
+                pingDot.className = 'relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500';
+                pingPulse.className = 'hidden';
+            }
+        }
+
+        // 2. FETCH PRODUCTS FROM API
+        async function fetchProducts() {
+            const grid = document.getElementById('products-grid');
+            const refreshBtn = document.getElementById('refresh-btn');
+            
+            // Spin refresh icon
+            refreshBtn.classList.add('animate-spin');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/v1/products`);
+                if (!response.ok) throw new Error('Error al cargar productos');
+                
+                products = await response.json();
+                showToast('Catálogo actualizado con éxito', 'success');
+            } catch (error) {
+                console.warn('API no disponible o despertando. Cargando datos de contingencia.', error);
+                products = [...MOCK_PRODUCTS];
+                showToast('Usando datos locales de contingencia', 'warning');
+            } finally {
+                refreshBtn.classList.remove('animate-spin');
+                renderProducts();
+            }
+        }
+
+        // 3. RENDER PRODUCTS GRID
+        function renderProducts(searchTerm = '') {
+            const grid = document.getElementById('products-grid');
+            const countSpan = document.getElementById('product-count');
+
+            const filtered = products.filter(p => 
+                p.nombre.toLowerCase().includes(searchTerm) || 
+                p.sku.toLowerCase().includes(searchTerm)
+            );
+
+            countSpan.textContent = `${filtered.length} productos`;
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `
+                    <div class="col-span-full bg-slate-900 border border-slate-800 rounded-2xl p-8 text-center text-slate-500">
+                        <i class="fa-solid fa-magnifying-glass text-3xl mb-2 opacity-40"></i>
+                        <p class="text-sm">No se encontraron materiales</p>
+                    </div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(product => {
+                const isLowStock = product.stock_actual <= product.stock_minimo;
+                const isOutOfStock = product.stock_actual <= 0;
+
+                return `
+                    <div class="bg-slate-900 border border-slate-800/80 hover:border-slate-700 rounded-2xl p-4 flex flex-col justify-between transition-all duration-200 hover:shadow-lg group">
+                        <div>
+                            <!-- Top Info: SKU & Stock Badge -->
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-[11px] font-mono font-medium text-slate-400 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800/80">
+                                    ${product.sku}
+                                </span>
+                                <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full border ${
+                                    isOutOfStock 
+                                        ? 'bg-red-500/10 text-red-400 border-red-500/20' 
+                                        : isLowStock 
+                                            ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' 
+                                            : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                }">
+                                    ${isOutOfStock ? 'Agotado' : `Stock: ${product.stock_actual}`}
+                                </span>
+                            </div>
+
+                            <!-- Product Name -->
+                            <h3 class="font-semibold text-slate-100 text-sm mb-3 group-hover:text-brand-500 transition line-clamp-2">
+                                ${product.nombre}
+                            </h3>
+                        </div>
+
+                        <!-- Price & Add Button -->
+                        <div class="pt-3 border-t border-slate-800/60 flex items-center justify-between">
+                            <div>
+                                <span class="text-[10px] uppercase text-slate-500 block">Precio Venta</span>
+                                <span class="text-base font-bold text-white font-mono">$${Number(product.precio_venta).toFixed(2)}</span>
+                            </div>
+                            <button onclick="addToCart(${product.id})" ${isOutOfStock ? 'disabled' : ''}
+                                    class="bg-slate-800 hover:bg-brand-500 hover:text-slate-950 text-slate-200 disabled:opacity-30 disabled:hover:bg-slate-800 disabled:hover:text-slate-200 font-semibold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition active:scale-95">
+                                <i class="fa-solid fa-cart-plus text-xs"></i>
+                                <span>Agregar</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // 4. CART MANAGEMENT FUNCTIONS
+        function addToCart(productId) {
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+
+            const existingItem = cart.find(item => item.id === productId);
+
+            if (existingItem) {
+                if (existingItem.quantity + 1 > product.stock_actual) {
+                    showToast(`Stock máximo alcanzado para ${product.nombre}`, 'warning');
+                    return;
+                }
+                existingItem.quantity += 1;
+            } else {
+                cart.push({ ...product, quantity: 1 });
+            }
+
+            renderCart();
+            showToast(`Añadido: ${product.nombre}`, 'info');
+        }
+
+        function updateCartQuantity(productId, delta) {
+            const item = cart.find(i => i.id === productId);
+            if (!item) return;
+
+            const product = products.find(p => p.id === productId);
+            const newQty = item.quantity + delta;
+
+            if (newQty <= 0) {
+                removeFromCart(productId);
+                return;
+            }
+
+            if (product && newQty > product.stock_actual) {
+                showToast(`Stock máximo alcanzado (${product.stock_actual})`, 'warning');
+                return;
+            }
+
+            item.quantity = newQty;
+            renderCart();
+        }
+
+        function removeFromCart(productId) {
+            cart = cart.filter(item => item.id !== productId);
+            renderCart();
+        }
+
+        function clearCart() {
+            cart = [];
+            renderCart();
+        }
+
+        function renderCart() {
+            const cartItemsContainer = document.getElementById('cart-items');
+            const subtotalSpan = document.getElementById('summary-subtotal');
+            const totalSpan = document.getElementById('summary-total');
+            const checkoutBtn = document.getElementById('checkout-btn');
+
+            if (cart.length === 0) {
+                cartItemsContainer.innerHTML = `
+                    <div id="empty-cart-msg" class="flex flex-col items-center justify-center py-12 text-slate-500 text-center">
+                        <i class="fa-solid fa-basket-shopping text-4xl mb-3 opacity-30"></i>
+                        <p class="text-sm font-medium">El carrito está vacío</p>
+                        <p class="text-xs text-slate-600 mt-1">Selecciona materiales del catálogo para vender</p>
+                    </div>`;
+                subtotalSpan.textContent = '$0.00';
+                totalSpan.textContent = '$0.00';
+                checkoutBtn.disabled = true;
+                return;
+            }
+
+            let total = 0;
+
+            cartItemsContainer.innerHTML = cart.map(item => {
+                const itemTotal = item.precio_venta * item.quantity;
+                total += itemTotal;
+
+                return `
+                    <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-3 flex items-center justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                            <h4 class="text-xs font-semibold text-slate-200 truncate">${item.nombre}</h4>
+                            <p class="text-[11px] font-mono text-brand-500 font-medium">$${Number(item.precio_venta).toFixed(2)} c/u</p>
+                        </div>
+
+                        <!-- Quantity Adjuster -->
+                        <div class="flex items-center gap-1.5 bg-slate-900 border border-slate-800 rounded-lg p-1">
+                            <button onclick="updateCartQuantity(${item.id}, -1)" class="w-5 h-5 text-xs text-slate-400 hover:text-white flex items-center justify-center">
+                                <i class="fa-solid fa-minus"></i>
+                            </button>
+                            <span class="text-xs font-bold text-white px-1 font-mono">${item.quantity}</span>
+                            <button onclick="updateCartQuantity(${item.id}, 1)" class="w-5 h-5 text-xs text-slate-400 hover:text-white flex items-center justify-center">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+
+                        <!-- Item Total & Remove -->
+                        <div class="text-right">
+                            <p class="text-xs font-bold text-white font-mono">$${itemTotal.toFixed(2)}</p>
+                            <button onclick="removeFromCart(${item.id})" class="text-[10px] text-slate-500 hover:text-red-400 transition">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            subtotalSpan.textContent = `$${total.toFixed(2)}`;
+            totalSpan.textContent = `$${total.toFixed(2)}`;
+            checkoutBtn.disabled = false;
+        }
+
+        // 5. PROCESS CHECKOUT / VENTA
+        async function processCheckout() {
+            if (cart.length === 0) return;
+
+            const checkoutBtn = document.getElementById('checkout-btn');
+            const customerName = document.getElementById('customer-name').value || 'Cliente Contado';
+
+            checkoutBtn.disabled = true;
+            checkoutBtn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> Procesando Venta...`;
+
+            // Deduct local stock for immediate user feedback
+            cart.forEach(cartItem => {
+                const prod = products.find(p => p.id === cartItem.id);
+                if (prod) {
+                    prod.stock_actual -= cartItem.quantity;
+                }
+            });
+
+            // Simulate server transaction time
+            setTimeout(() => {
+                showToast(`¡Venta completada para ${customerName}!`, 'success');
+                clearCart();
+                renderProducts();
+
+                checkoutBtn.innerHTML = `<i class="fa-solid fa-receipt"></i><span>Completar Venta</span>`;
+            }, 800);
+        }
+
+        // 6. CREATE NEW PRODUCT HANDLER
+        async function handleCreateProduct(e) {
+            e.preventDefault();
+
+            const btn = document.getElementById('save-product-btn');
+            btn.disabled = true;
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch animate-spin"></i> Guardando...`;
+
+            const newProduct = {
+                sku: document.getElementById('form-sku').value.trim(),
+                nombre: document.getElementById('form-nombre').value.trim(),
+                precio_compra: parseFloat(document.getElementById('form-precio-compra').value),
+                precio_venta: parseFloat(document.getElementById('form-precio-venta').value),
+                stock_actual: parseInt(document.getElementById('form-stock-actual').value),
+                stock_minimo: parseInt(document.getElementById('form-stock-minimo').value)
+            };
+
+            try {
+                if (isApiOnline) {
+                    const res = await fetch(`${API_BASE_URL}/api/v1/products`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(newProduct)
+                    });
+
+                    if (!res.ok) throw new Error('Error en el servidor');
+                    
+                    const savedProduct = await res.json();
+                    products.push(savedProduct);
+                } else {
+                    // Fallback local save
+                    const mockSaved = { ...newProduct, id: Date.now() };
+                    products.push(mockSaved);
+                }
+
+                showToast('Material registrado exitosamente', 'success');
+                toggleModal('product-modal', false);
+                document.getElementById('product-form').reset();
+                renderProducts();
+
+            } catch (err) {
+                showToast('No se pudo guardar el producto en Render', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `<i class="fa-solid fa-floppy-disk"></i><span>Guardar Producto</span>`;
+            }
+        }
+
+        // 7. UTILITY FUNCTIONS (Modals & Toasts)
+        function toggleModal(modalId, show) {
+            const modal = document.getElementById(modalId);
+            if (show) modal.classList.remove('hidden');
+            else modal.classList.add('hidden');
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+
+            const icons = {
+                success: 'fa-circle-check text-emerald-400',
+                error: 'fa-circle-xmark text-red-400',
+                warning: 'fa-triangle-exclamation text-amber-400',
+                info: 'fa-circle-info text-sky-400'
+            };
+
+            toast.className = `pointer-events-auto bg-slate-900 border border-slate-800 text-slate-100 px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-medium animate-in slide-in-from-top-2 duration-200`;
+            toast.innerHTML = `
+                <i class="fa-solid ${icons[type]} text-base"></i>
+                <span class="flex-1">${message}</span>
+            `;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'transition-opacity', 'duration-300');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
